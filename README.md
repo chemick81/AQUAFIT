@@ -33,7 +33,9 @@ const SUPABASE_ANON_KEY = "ta-clé-anon";
    - `GEMINI_API_KEY` = la clé copiée ci-dessus
 4. Deploy — Netlify détecte `netlify.toml` et déploie automatiquement la fonction `analyze-invoice`
 
-> Le tier gratuit de Gemini (modèle `gemini-2.5-flash`) est largement suffisant pour le volume d'une petite association (quelques factures par semaine). Si un jour tu dépasses le quota gratuit, Google renvoie une erreur 429 — l'appli bascule alors automatiquement en saisie manuelle par la trésorière (rien ne casse).
+> Le tier gratuit de Gemini (modèle `gemini-flash-latest`, l'alias du dernier Flash stable de Google) est largement suffisant pour le volume d'une petite association (quelques factures par semaine). Si un jour tu dépasses le quota gratuit, Google renvoie une erreur 429 — l'appli bascule alors automatiquement en saisie manuelle par la trésorière (rien ne casse).
+>
+> Google retire régulièrement ses anciens modèles (ex: `gemini-2.5-flash` a été retiré en 2026). En utilisant l'alias `gemini-flash-latest` dans `netlify/functions/analyze-invoice.js`, l'appli reste à jour automatiquement sans qu'il faille modifier le code. Si l'erreur "This model … is no longer available" réapparaît un jour, consulte https://ai.google.dev/gemini-api/docs/models pour le nom du modèle courant.
 
 ## 4. Premier admin (toi / la trésorière)
 

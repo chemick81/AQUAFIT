@@ -6,6 +6,13 @@
 //
 // Variable d'environnement requise sur Netlify : GEMINI_API_KEY
 // (clé gratuite sur https://aistudio.google.com — voir README.md)
+//
+// Modèle : "gemini-flash-latest" est un alias que Google fait pointer vers
+// son dernier modèle Flash stable (actuellement Gemini 3.5 Flash). Google
+// retire régulièrement les anciens modèles (ex: gemini-2.5-flash, retiré
+// mi-2026) ; utiliser l'alias "-latest" évite d'avoir à changer ce fichier
+// à chaque dépréciation. Si besoin de figer une version précise, voir la
+// liste à jour ici : https://ai.google.dev/gemini-api/docs/models
 
 const PLAFOND = 150; // Doit rester aligné avec PLAFOND dans index.html et supabase_schema.sql
 
@@ -51,7 +58,7 @@ Si tu ne trouves pas de montant clair, mets "amount": null et explique brièveme
 
   try {
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
