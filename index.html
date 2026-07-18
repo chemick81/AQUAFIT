@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQUAFIT Saint Aubin · Remboursements</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --navy:#0a3a56;
+  --navy-light:#0f5478;
+  --accent:#1ba7c9;
+  --accent-soft:#dcf2f7;
+  --success:#178f7a;
+  --success-soft:#dff2ee;
+  --cream:#f5faf9;
+  --charcoal:#1c1c1c;
+  --red:#b3261e;
+  --red-soft:#f8e6e4;
+  --line:#dde8e6;
+  --muted:#5f7a79;
+  --radius:10px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--cream);color:var(--charcoal);font-family:'Inter',sans-serif;}
+h1,h2,h3,.display{font-family:'Fraunces',serif;}
+a{color:inherit;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;font-size:14px;}
+/* ---------- Header ---------- */
+header.topbar{
+  background:var(--navy);color:#fff;padding:16px 28px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand .mark{
+  width:38px;height:38px;object-fit:contain;flex-shrink:0;
+}
+.brand .name{font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:.3px;}
+.brand .sub{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;}
+.who{display:flex;align-items:center;gap:14px;font-size:13px;}
+.who .role-pill{
+  background:var(--accent);color:var(--navy);padding:3px 10px;border-radius:20px;
+  font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+}
+.logout-btn{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;
+  padding:7px 14px;border-radius:8px;font-size:13px;}
+.logout-btn:hover{background:rgba(255,255,255,.1);}
+/* ---------- Layout ---------- */
+main{max-width:1080px;margin:0 auto;padding:32px 24px 80px;}
+.tabs{display:flex;gap:6px;margin-bottom:28px;border-bottom:1px solid var(--line);}
+.tab{padding:10px 18px;border:none;background:none;font-size:14px;font-weight:600;
+  color:var(--muted);border-bottom:2px solid transparent;}
+.tab.active{color:var(--navy);border-bottom-color:var(--accent);}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
+.card h2{margin:0 0 4px;font-size:20px;}
+.card .hint{color:var(--muted);font-size:13px;margin-bottom:18px;}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--navy);margin:14px 0 5px;text-transform:uppercase;letter-spacing:.4px;}
+input[type=text],input[type=number],input[type=date],textarea,select{
+  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--cream);
+}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;background:#fff;}
+textarea{resize:vertical;min-height:60px;}
+.file-drop{
+  border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;
+  color:var(--muted);font-size:13.5px;background:var(--cream);margin-top:6px;
+}
+.file-drop.has-file{border-color:var(--success);background:var(--success-soft);color:var(--success);}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:8px;border:none;
+  font-weight:600;font-size:14px;
+}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy-light);}
+.btn-primary:disabled{background:#a9a49a;cursor:not-allowed;}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--charcoal);}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-success{background:var(--success);color:#fff;}
+.btn-sm{padding:6px 12px;font-size:12.5px;}
+.ai-box{margin-top:16px;border:1px solid var(--accent-soft);background:#fffdf7;border-radius:8px;padding:14px 16px;}
+.ai-box .row{display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;}
+.ai-box .label{color:var(--muted);}
+.ai-badge{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.ai-badge.high{background:var(--success-soft);color:var(--success);}
+.ai-badge.medium{background:var(--accent-soft);color:#8a6d0f;}
+.ai-badge.low{background:var(--red-soft);color:var(--red);}
+/* Plafond gauge */
+.gauge{height:8px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:6px;position:relative;}
+.gauge-fill{height:100%;background:var(--accent);}
+.gauge-fill.capped{background:var(--success);}
+.gauge-label{font-size:11px;color:var(--muted);margin-top:4px;display:flex;justify-content:space-between;}
+/* Table (admin) */
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+  padding:8px 10px;border-bottom:1px solid var(--line);}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+tr:hover td{background:#fbfaf7;}
+.status-badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  padding:3px 10px;border-radius:20px;}
+.status-pending{background:var(--accent-soft);color:#8a6d0f;}
+.status-approved{background:var(--success-soft);color:var(--success);}
+.status-rejected{background:var(--red-soft);color:var(--red);}
+.status-paid{background:var(--navy);color:#fff;}
+.filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.filters select{width:auto;}
+.empty{text-align:center;color:var(--muted);padding:40px 0;font-size:14px;}
+.req-list{display:flex;flex-direction:column;gap:12px;}
+.req-item{border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+.req-item .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.req-item .title{font-weight:600;font-size:14.5px;}
+.req-item .meta{color:var(--muted);font-size:12.5px;margin-top:2px;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(13,35,64,.55);display:flex;
+  align-items:center;justify-content:center;padding:20px;z-index:50;}
+.modal{background:#fff;border-radius:12px;padding:28px;max-width:520px;width:100%;max-height:88vh;overflow:auto;}
+.modal h3{margin-top:0;}
+.modal .close{float:right;border:none;background:none;font-size:18px;color:var(--muted);}
+.login-wrap{max-width:400px;margin:80px auto;padding:0 20px;}
+.login-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:32px;}
+.login-card .brand{justify-content:center;margin-bottom:6px;}
+.login-card p.tag{text-align:center;color:var(--muted);font-size:13px;margin:0 0 24px;}
+.switch-mode{text-align:center;margin-top:16px;font-size:13px;color:var(--muted);}
+.switch-mode button{background:none;border:none;color:var(--navy);font-weight:600;text-decoration:underline;}
+.error-msg{background:var(--red-soft);color:var(--red);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px;}
+.success-msg{background:var(--success-soft);color:var(--success);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px;}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* =========================================================
+   CONFIG — à compléter avec tes clés Supabase
+========================================================= */
+const SUPABASE_URL = "https://azlwteuimydrxeuqppdt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6bHd0ZXVpbXlkcnhldXFwcGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODMzNjYsImV4cCI6MjA5OTk1OTM2Nn0.PYflJpIDP5HUegHsiZ2ELvRZ_UVXpsHrsxNXsEQpoLg";
+const PLAFOND = 150; // Plafond de remboursement des frais de piscine (à ajuster selon le budget de l'association)
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let state = {
+  session: null,
+  profile: null,
+  view: "member", // 'member' | 'admin'
+  authMode: "login", // 'login' | 'signup'
+  requests: [],
+  loading: true,
+  pendingFile: null,
+  aiResult: null,
+  analyzing: false,
+  submitting: false,
+  authError: "",
+  filterStatus: "all",
+};
+const el = (sel) => document.querySelector(sel);
+const fmtEUR = (n) => n == null ? "—" : n.toLocaleString("fr-FR", {style:"currency", currency:"EUR"});
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
+function render(){
+  const app = el("#app");
+  if (state.loading){
+    app.innerHTML = `<div style="padding:60px;text-align:center;color:#6b6558;">Chargement…</div>`;
+    return;
+  }
+  if (!state.session){
+    app.innerHTML = renderLogin();
+    bindLoginEvents();
+    return;
+  }
+  app.innerHTML = renderShell();
+  bindShellEvents();
+}
+/* ---------------- LOGIN / SIGNUP ---------------- */
+function renderLogin(){
+  const isSignup = state.authMode === "signup";
+  return `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand"><img class="mark" src="assets/logo.png" alt="AQUAFIT" style="width:56px;height:56px;"><div><div class="name">AQUAFIT</div><div class="sub">Saint Aubin</div></div></div>
+      <p class="tag">Association Aquafit Saint Aubin — remboursement des frais de piscine des adhérents</p>
+      <form id="auth-form">
+        ${isSignup ? `
+        <label>Prénom</label><input type="text" id="f-firstname" required>
+        <label>Nom</label><input type="text" id="f-lastname" required>
+        ` : ""}
+        <label>Email</label><input type="text" id="f-email" required>
+        <label>Mot de passe</label><input type="password" id="f-password" required minlength="6">
+        <div style="margin-top:20px;">
+          <button type="submit" class="btn btn-primary" id="auth-submit" style="width:100%;justify-content:center;">
+            ${isSignup ? "Créer mon compte" : "Se connecter"}
+          </button>
+        </div>
+      </form>
+      ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ""}
+      <div class="switch-mode">
+        ${isSignup ? "Déjà inscrit ?" : "Pas encore de compte ?"}
+        <button id="switch-mode-btn">${isSignup ? "Se connecter" : "Créer un compte"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function bindLoginEvents(){
+  el("#switch-mode-btn").onclick = () => {
+    state.authMode = state.authMode === "login" ? "signup" : "login";
+    state.authError = "";
+    render();
+  };
+  el("#auth-form").onsubmit = async (e) => {
+    e.preventDefault();
+    state.authError = "";
+    const email = el("#f-email").value.trim();
+    const password = el("#f-password").value;
+    const btn = el("#auth-submit");
+    btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+    try{
+      if (state.authMode === "signup"){
+        const first_name = el("#f-firstname").value.trim();
+        const last_name = el("#f-lastname").value.trim();
+        const { error } = await sb.auth.signUp({
+          email, password,
+          options: { data: { first_name, last_name } }
+        });
+        if (error) throw error;
+        state.authError = "";
+        alert("Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.");
+        state.authMode = "login";
+        render();
+        return;
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+      await bootstrap();
+    } catch(err){
+      state.authError = translateAuthError(err.message);
+      render();
+    }
+  };
+}
+function translateAuthError(msg){
+  if (/invalid login credentials/i.test(msg)) return "Email ou mot de passe incorrect.";
+  if (/already registered/i.test(msg)) return "Un compte existe déjà avec cet email.";
+  return msg;
+}
+/* ---------------- SHELL ---------------- */
+function renderShell(){
+  const isAdmin = state.profile?.role === "admin";
+  return `
+  <header class="topbar">
+    <div class="brand">
+      <img class="mark" src="assets/logo.png" alt="AQUAFIT">
+      <div><div class="name">AQUAFIT</div><div class="sub">Saint Aubin</div></div>
+    </div>
+    <div class="who">
+      <span>${state.profile?.first_name || ""} ${state.profile?.last_name || ""}</span>
+      <span class="role-pill">${isAdmin ? "Trésorière / Admin" : "Adhérent"}</span>
+      <button class="logout-btn" id="logout-btn">Déconnexion</button>
+    </div>
+  </header>
+  <main>
+    <div class="tabs">
+      <button class="tab ${state.view==='member'?'active':''}" data-view="member">Mes demandes</button>
+      <button class="tab ${state.view==='profile'?'active':''}" data-view="profile">Mon profil</button>
+      ${isAdmin ? `
+      <button class="tab ${state.view==='admin'?'active':''}" data-view="admin">Espace trésorière</button>
+      <button class="tab ${state.view==='members'?'active':''}" data-view="members">Adhérents</button>
+      ` : ""}
+    </div>
+    ${renderCurrentView(isAdmin)}
+  </main>
+  `;
+}
+function renderCurrentView(isAdmin){
+  if (state.view === "admin" && isAdmin) return renderAdminView();
+  if (state.view === "members" && isAdmin) return renderMembersView();
+  if (state.view === "profile") return renderProfileView();
+  return renderMemberView();
+}
+function bindShellEvents(){
+  el("#logout-btn").onclick = async () => { await sb.auth.signOut(); state.session=null; state.profile=null; render(); };
+  document.querySelectorAll(".tab").forEach(t => t.onclick = async () => {
+    state.view = t.dataset.view;
+    if (state.view === "members" && !state.profiles) await loadProfiles();
+    render();
+  });
+  if (state.view === "member") bindMemberEvents();
+  if (state.view === "admin") bindAdminEvents();
+  if (state.view === "members") bindMembersEvents();
+  if (state.view === "profile") bindProfileEvents();
+}
+/* ---------------- MEMBER VIEW ---------------- */
+function renderMemberView(){
+  const mine = state.requests.filter(r => r.member_id === state.profile.id);
+  return `
+  <div class="card">
+    <h2>Nouvelle demande de remboursement</h2>
+    <p class="hint">Plafond de remboursement : ${PLAFOND} € sur justificatif. Dépose ta facture, le montant est lu automatiquement.</p>
+    <form id="new-request-form">
+      <label>Activité / motif</label>
+      <input type="text" id="r-label" placeholder="Ex : Abonnement piscine — trimestre 1 2026" required>
+      <label>Précision (optionnel)</label>
+      <textarea id="r-desc" placeholder="Détails complémentaires…"></textarea>
+      <label>Justificatif (PDF, JPG, PNG)</label>
+      <div class="file-drop" id="file-drop">
+        <input type="file" id="r-file" accept="application/pdf,image/*" style="display:none;">
+        <div id="file-drop-text">Clique pour choisir un fichier, ou glisse-le ici</div>
+      </div>
+      <div id="ai-result-box"></div>
+      <div style="margin-top:20px;">
+        <button type="submit" class="btn btn-primary" id="submit-request-btn" disabled>Envoyer la demande</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Historique de mes demandes</h2>
+    ${mine.length === 0 ? `<div class="empty">Aucune demande pour le moment.</div>` : `
+    <div class="req-list">
+      ${mine.map(renderMemberRequestItem).join("")}
+    </div>
+    `}
+  </div>
+  `;
+}
+function renderMemberRequestItem(r){
+  const amount = r.confirmed_amount ?? r.ai_extracted_amount;
+  const pct = amount ? Math.min(100, (Math.min(amount, PLAFOND) / PLAFOND) * 100) : 0;
+  return `
+  <div class="req-item">
+    <div class="top">
+      <div>
+        <div class="title">${r.activity_label}</div>
+        <div class="meta">Déposé le ${fmtDate(r.submitted_at)}${r.ai_vendor ? " · " + r.ai_vendor : ""}</div>
+      </div>
+      <span class="status-badge status-${r.status}">${statusLabel(r.status)}</span>
+    </div>
+    ${amount != null ? `
+    <div class="gauge-label"><span>Montant facture : ${fmtEUR(amount)}</span><span>Remboursé : ${fmtEUR(r.reimbursed_amount)}</span></div>
+    <div class="gauge"><div class="gauge-fill ${amount>=PLAFOND?'capped':''}" style="width:${pct}%"></div></div>
+    ` : `<div class="meta" style="margin-top:8px;color:var(--red);">Montant en cours de vérification par la trésorière.</div>`}
+  </div>
+  `;
+}
+function statusLabel(s){
+  return {pending:"En attente", approved:"Validé", rejected:"Refusé", paid:"Payé"}[s] || s;
+}
+function bindMemberEvents(){
+  const drop = el("#file-drop");
+  const input = el("#r-file");
+  drop.onclick = () => input.click();
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    state.pendingFile = file;
+    el("#file-drop-text").textContent = "📎 " + file.name;
+    drop.classList.add("has-file");
+    await analyzeInvoice(file);
+  };
+  el("#new-request-form").onsubmit = async (e) => {
+    e.preventDefault();
+    if (!state.pendingFile){ alert("Ajoute d'abord un justificatif."); return; }
+    await submitRequest();
+  };
+}
+async function analyzeInvoice(file){
+  state.analyzing = true;
+  el("#ai-result-box").innerHTML = `<div class="ai-box">Analyse du document en cours…</div>`;
+  try{
+    const base64Data = await fileToBase64(file);
+    const res = await fetch("/.netlify/functions/analyze-invoice", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ base64Data, mediaType: file.type })
+    });
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch(parseErr){
+      throw new Error(
+        res.status === 404
+          ? "Fonction d'analyse introuvable (le site est-il bien déployé sur Netlify, pas ouvert en local ?)"
+          : `Réponse inattendue du serveur (code ${res.status}). Vérifie que GEMINI_API_KEY est bien configurée sur Netlify.`
+      );
+    }
+    state.aiResult = data;
+    renderAiBox(data);
+    el("#submit-request-btn").disabled = false;
+  } catch(err){
+    el("#ai-result-box").innerHTML = `<div class="error-msg">Analyse impossible (${err.message}). Tu peux quand même envoyer, la trésorière vérifiera manuellement.</div>`;
+    el("#submit-request-btn").disabled = false;
+  } finally {
+    state.analyzing = false;
+  }
+}
+function renderAiBox(data){
+  if (data.error){
+    el("#ai-result-box").innerHTML = `<div class="error-msg">Erreur API : ${data.error}${data.detail ? " — " + String(data.detail).slice(0,300) : ""}</div>`;
+    return;
+  }
+  if (data.amount == null){
+    el("#ai-result-box").innerHTML = `<div class="ai-box"><div class="row"><span class="label">Lecture automatique</span><span class="ai-badge low">Échec</span></div>
+    <div class="row" style="color:var(--muted);">${data.notes || "Montant non détecté, vérification manuelle par la trésorière."}</div></div>`;
+    return;
+  }
+  el("#ai-result-box").innerHTML = `
+  <div class="ai-box">
+    <div class="row"><span class="label">Montant détecté</span><strong>${fmtEUR(data.amount)}</strong></div>
+    <div class="row"><span class="label">Montant remboursable (plafond ${PLAFOND} €)</span><strong>${fmtEUR(data.reimbursed_amount)}</strong></div>
+    ${data.vendor ? `<div class="row"><span class="label">Fournisseur</span><span>${data.vendor}</span></div>` : ""}
+    ${data.invoice_date ? `<div class="row"><span class="label">Date facture</span><span>${fmtDate(data.invoice_date)}</span></div>` : ""}
+    <div class="row"><span class="label">Fiabilité de la lecture</span><span class="ai-badge ${data.confidence||'low'}">${data.confidence||'low'}</span></div>
+  </div>`;
+}
+/* ---------------- MON PROFIL (adhérent) ---------------- */
+function renderProfileView(){
+  const p = state.profile;
+  return `
+  <div class="card" style="max-width:480px;">
+    <h2>Mon profil</h2>
+    <p class="hint">Ces coordonnées bancaires servent uniquement à la trésorière pour te rembourser. Elles ne sont visibles que par toi et les admins.</p>
+    <form id="profile-form">
+      <label>Prénom</label><input type="text" id="p-firstname" value="${p.first_name || ""}" required>
+      <label>Nom</label><input type="text" id="p-lastname" value="${p.last_name || ""}" required>
+      <label>IBAN</label><input type="text" id="p-iban" value="${p.iban || ""}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX">
+      <label>BIC</label><input type="text" id="p-bic" value="${p.bic || ""}" placeholder="Ex : AGRIFRPP123">
+      <div id="profile-msg"></div>
+      <div style="margin-top:18px;">
+        <button type="submit" class="btn btn-primary" id="profile-submit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+  `;
+}
+function isPlausibleIban(v){
+  const clean = (v || "").replace(/\s+/g, "").toUpperCase();
+  if (!clean) return true; // champ optionnel
+  return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(clean);
+}
+function bindProfileEvents(){
+  el("#profile-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const iban = el("#p-iban").value.trim();
+    const bic = el("#p-bic").value.trim();
+    const msgBox = el("#profile-msg");
+    msgBox.innerHTML = "";
+    if (!isPlausibleIban(iban)){
+      msgBox.innerHTML = `<div class="error-msg">Format d'IBAN qui semble incorrect (ex attendu : FR76 1234 5678 ...). Corrige avant d'enregistrer.</div>`;
+      return;
+    }
+    const btn = el("#profile-submit");
+    btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+    const { error } = await sb.from("profiles").update({
+      first_name: el("#p-firstname").value.trim(),
+      last_name: el("#p-lastname").value.trim(),
+      iban: iban.replace(/\s+/g, "").toUpperCase() || null,
+      bic: bic.toUpperCase() || null,
+    }).eq("id", state.profile.id);
+    if (error){
+      msgBox.innerHTML = `<div class="error-msg">Erreur : ${error.message}</div>`;
+      btn.disabled = false; btn.textContent = "Enregistrer";
+      return;
+    }
+    const { data: profile } = await sb.from("profiles").select("*").eq("id", state.profile.id).single();
+    state.profile = profile;
+    msgBox.innerHTML = `<div class="success-msg">Profil mis à jour.</div>`;
+    render();
+  };
+}
+/* ---------------- ADHÉRENTS (admin) ---------------- */
+async function loadProfiles(){
+  const { data, error } = await sb.from("profiles").select("*").order("last_name");
+  if (!error) state.profiles = data;
+}
+function renderMembersView(){
+  const list = state.profiles || [];
+  return `
+  <div class="card" style="padding:0;overflow:auto;">
+    <div style="padding:20px 24px 0;"><h2>Adhérents</h2><p class="hint">Coordonnées bancaires saisies par chaque adhérent — la trésorière peut corriger si besoin.</p></div>
+    ${list.length === 0 ? `<div class="empty">Aucun adhérent.</div>` : `
+    <table>
+      <thead><tr><th>Nom</th><th>Email</th><th>IBAN</th><th>BIC</th><th>Rôle</th><th></th></tr></thead>
+      <tbody>
+        ${list.map(m => `
+        <tr>
+          <td>${m.first_name} ${m.last_name}</td>
+          <td>${m.email}</td>
+          <td>${m.iban ? maskIban(m.iban) : "<span style='color:var(--red);'>non renseigné</span>"}</td>
+          <td>${m.bic || "—"}</td>
+          <td>${m.role === "admin" ? "Trésorière/Admin" : "Adhérent"}</td>
+          <td><button class="btn btn-ghost btn-sm edit-member-btn" data-id="${m.id}">Modifier</button></td>
+        </tr>
+        `).join("")}
+      </tbody>
+    </table>
+    `}
+  </div>
+  `;
+}
+function maskIban(iban){
+  const clean = iban.replace(/\s+/g,"");
+  return clean.slice(0,4) + " •••• •••• " + clean.slice(-4);
+}
+function bindMembersEvents(){
+  document.querySelectorAll(".edit-member-btn").forEach(b => b.onclick = () => openMemberEditModal(b.dataset.id));
+}
+function openMemberEditModal(id){
+  const m = (state.profiles || []).find(x => x.id === id);
+  if (!m) return;
+  const modalHtml = `
+  <div class="modal-backdrop" id="member-modal">
+    <div class="modal">
+      <button class="close" id="close-member-modal">✕</button>
+      <h3>${m.first_name} ${m.last_name}</h3>
+      <label>IBAN</label><input type="text" id="m-iban" value="${m.iban || ""}">
+      <label>BIC</label><input type="text" id="m-bic" value="${m.bic || ""}">
+      <label>Rôle</label>
+      <select id="m-role">
+        <option value="member" ${m.role==="member"?"selected":""}>Adhérent</option>
+        <option value="admin" ${m.role==="admin"?"selected":""}>Trésorière / Admin</option>
+      </select>
+      <div id="member-modal-msg"></div>
+      <div style="margin-top:18px;">
+        <button class="btn btn-primary btn-sm" id="save-member-btn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", modalHtml);
+  el("#close-member-modal").onclick = () => el("#member-modal").remove();
+  el("#save-member-btn").onclick = async () => {
+    const iban = el("#m-iban").value.trim();
+    const bic = el("#m-bic").value.trim();
+    if (!isPlausibleIban(iban)){
+      el("#member-modal-msg").innerHTML = `<div class="error-msg">Format d'IBAN qui semble incorrect.</div>`;
+      return;
+    }
+    const { error } = await sb.from("profiles").update({
+      iban: iban.replace(/\s+/g,"").toUpperCase() || null,
+      bic: bic.toUpperCase() || null,
+      role: el("#m-role").value,
+    }).eq("id", m.id);
+    if (error){ el("#member-modal-msg").innerHTML = `<div class="error-msg">${error.message}</div>`; return; }
+    el("#member-modal").remove();
+    await loadProfiles();
+    render();
+  };
+}
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(",")[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+async function submitRequest(){
+  const btn = el("#submit-request-btn");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+  try{
+    const file = state.pendingFile;
+    const path = `${state.profile.id}/${Date.now()}_${file.name}`;
+    const { error: upErr } = await sb.storage.from("justificatifs").upload(path, file);
+    if (upErr) throw upErr;
+    const ai = state.aiResult || {};
+    const { error: insErr } = await sb.from("reimbursement_requests").insert({
+      member_id: state.profile.id,
+      activity_label: el("#r-label").value.trim(),
+      description: el("#r-desc").value.trim(),
+      invoice_file_path: path,
+      invoice_file_name: file.name,
+      ai_extracted_amount: ai.amount ?? null,
+      ai_vendor: ai.vendor ?? null,
+      ai_invoice_date: ai.invoice_date ?? null,
+      ai_confidence: ai.confidence ?? null,
+      ai_raw_response: ai,
+    });
+    if (insErr) throw insErr;
+    await loadRequests();
+    state.pendingFile = null;
+    state.aiResult = null;
+    render();
+  } catch(err){
+    alert("Erreur lors de l'envoi : " + err.message);
+    btn.disabled = false; btn.textContent = "Envoyer la demande";
+  }
+}
+/* ---------------- ADMIN VIEW ---------------- */
+function renderAdminView(){
+  const filtered = state.requests.filter(r => state.filterStatus === "all" || r.status === state.filterStatus);
+  return `
+  <div class="toolbar">
+    <div class="filters">
+      <select id="status-filter">
+        ${["all","pending","approved","rejected","paid"].map(s =>
+          `<option value="${s}" ${state.filterStatus===s?"selected":""}>${s==="all"?"Tous les statuts":statusLabel(s)}</option>`
+        ).join("")}
+      </select>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="export-csv-btn">Exporter virements (CSV)</button>
+  </div>
+  <div class="card" style="padding:0;overflow:auto;">
+    ${filtered.length === 0 ? `<div class="empty">Aucune demande.</div>` : `
+    <table>
+      <thead><tr>
+        <th>Adhérent</th><th>Activité</th><th>Déposé le</th><th>Montant facture</th>
+        <th>Remboursé</th><th>Statut</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${filtered.map(r => `
+        <tr>
+          <td>${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""}</td>
+          <td>${r.activity_label}</td>
+          <td>${fmtDate(r.submitted_at)}</td>
+          <td>${fmtEUR(r.confirmed_amount ?? r.ai_extracted_amount)}</td>
+          <td>${fmtEUR(r.reimbursed_amount)}</td>
+          <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
+          <td><button class="btn btn-ghost btn-sm review-btn" data-id="${r.id}">Examiner</button></td>
+        </tr>
+        `).join("")}
+      </tbody>
+    </table>
+    `}
+  </div>
+  `;
+}
+function bindAdminEvents(){
+  el("#status-filter").onchange = (e) => { state.filterStatus = e.target.value; render(); };
+  el("#export-csv-btn").onclick = exportPaymentsCsv;
+  document.querySelectorAll(".review-btn").forEach(b => b.onclick = () => openReviewModal(b.dataset.id));
+}
+async function openReviewModal(id){
+  const r = state.requests.find(x => x.id === id);
+  if (!r) return;
+  const { data: signed } = await sb.storage.from("justificatifs").createSignedUrl(r.invoice_file_path, 300);
+  const fileUrl = signed?.signedUrl || "#";
+  const modalHtml = `
+  <div class="modal-backdrop" id="review-modal">
+    <div class="modal">
+      <button class="close" id="close-modal">✕</button>
+      <h3>${r.activity_label}</h3>
+      <div class="meta" style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+        ${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""} · déposé le ${fmtDate(r.submitted_at)}
+      </div>
+      <a href="${fileUrl}" target="_blank" class="btn btn-ghost btn-sm">Voir le justificatif ↗</a>
+      <label>Montant confirmé (€)</label>
+      <input type="number" step="0.01" id="confirmed-amount" value="${r.confirmed_amount ?? r.ai_extracted_amount ?? ''}">
+      <div class="meta" style="font-size:12px;color:var(--muted);margin-top:4px;">
+        Montant lu par l'IA : ${fmtEUR(r.ai_extracted_amount)} (fiabilité : ${r.ai_confidence || "n/a"})<br>
+        Remboursement plafonné appliqué automatiquement à ${PLAFOND} €.
+      </div>
+      <label>Note interne (optionnel)</label>
+      <textarea id="admin-notes">${r.admin_notes || ""}</textarea>
+      <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+        <button class="btn btn-success btn-sm" id="approve-btn">Valider</button>
+        <button class="btn btn-danger btn-sm" id="reject-btn">Refuser</button>
+        ${r.status === "approved" ? `<button class="btn btn-primary btn-sm" id="paid-btn">Marquer payé</button>` : ""}
+      </div>
+    </div>
+  </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", modalHtml);
+  el("#close-modal").onclick = () => el("#review-modal").remove();
+  el("#approve-btn").onclick = () => updateRequestStatus(r.id, "approved");
+  el("#reject-btn").onclick = () => updateRequestStatus(r.id, "rejected");
+  const paidBtn = el("#paid-btn");
+  if (paidBtn) paidBtn.onclick = () => updateRequestStatus(r.id, "paid");
+}
+async function updateRequestStatus(id, status){
+  const confirmedAmount = parseFloat(el("#confirmed-amount").value) || null;
+  const adminNotes = el("#admin-notes").value.trim();
+  const payload = {
+    status,
+    confirmed_amount: confirmedAmount,
+    admin_notes: adminNotes,
+    reviewed_by: state.profile.id,
+    reviewed_at: new Date().toISOString(),
+  };
+  if (status === "paid") payload.paid_at = new Date().toISOString();
+  const { error } = await sb.from("reimbursement_requests").update(payload).eq("id", id);
+  if (error){ alert("Erreur : " + error.message); return; }
+  el("#review-modal").remove();
+  await loadRequests();
+  render();
+}
+async function exportPaymentsCsv(){
+  const { data, error } = await sb.from("v_payments_to_process").select("*");
+  if (error){ alert("Erreur export : " + error.message); return; }
+  if (!data || data.length === 0){ alert("Aucun virement à traiter (statut 'Validé')."); return; }
+  const headers = ["Prénom","Nom","IBAN","BIC","Motif","Montant"];
+  const rows = data.map(p => [p.first_name, p.last_name, p.iban, p.bic, p.activity_label, p.reimbursed_amount]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${(v ?? "").toString().replace(/"/g,'""')}"`).join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], {type:"text/csv;charset=utf-8;"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `aquafit_virements_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+}
+/* ---------------- DATA LOADING ---------------- */
+async function loadRequests(){
+  const { data, error } = await sb
+    .from("reimbursement_requests")
+    .select("*, profiles:member_id(first_name, last_name)")
+    .order("submitted_at", {ascending:false});
+  if (!error) state.requests = data;
+}
+async function bootstrap(){
+  state.loading = true; render();
+  const { data: { session } } = await sb.auth.getSession();
+  state.session = session;
+  if (session){
+    const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
+    state.profile = profile;
+    await loadRequests();
+  }
+  state.loading = false;
+  render();
+}
+sb.auth.onAuthStateChange((_event, session) => {
+  state.session = session;
+  if (!session){ state.profile = null; render(); }
+});
+bootstrap();
+</script>
+</body>
+</html>
