@@ -124,6 +124,7 @@ tr:hover td{background:#fbfaf7;}
 .switch-mode button{background:none;border:none;color:var(--navy);font-weight:600;text-decoration:underline;}
 .error-msg{background:var(--red-soft);color:var(--red);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px;}
 .success-msg{background:var(--success-soft);color:var(--success);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px;}
+.warn-msg{background:#fdf3d9;color:#8a6d0f;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px;}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);
   border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -134,16 +135,18 @@ tr:hover td{background:#fbfaf7;}
 <div id="app"></div>
 <script>
 /* =========================================================
-   CONFIG — à compléter avec tes clés Supabase
+CONFIG — à compléter avec tes clés Supabase
 ========================================================= */
 const SUPABASE_URL = "https://azlwteuimydrxeuqppdt.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6bHd0ZXVpbXlkcnhldXFwcGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODMzNjYsImV4cCI6MjA5OTk1OTM2Nn0.PYflJpIDP5HUegHsiZ2ELvRZ_UVXpsHrsxNXsEQpoLg";
-const PLAFOND = 150; // Plafond de remboursement des frais de piscine (à ajuster selon le budget de l'association)
+const PLAFOND_DEFAULT = 150; // valeur de secours tant que la table settings n'est pas encore chargée
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 let state = {
   session: null,
   profile: null,
-  view: "member", // 'member' | 'admin'
+  view: "member", // 'member' | 'admin' | 'members' | 'profile'
   authMode: "login", // 'login' | 'signup'
   requests: [],
   loading: true,
@@ -153,10 +156,16 @@ let state = {
   submitting: false,
   authError: "",
   filterStatus: "all",
+  plafond: PLAFOND_DEFAULT,
 };
+
 const el = (sel) => document.querySelector(sel);
 const fmtEUR = (n) => n == null ? "—" : n.toLocaleString("fr-FR", {style:"currency", currency:"EUR"});
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
+const roleLabel = (role) => ({member:"Adhérent", bureau:"Membre du bureau", tresorier:"Trésorier", admin:"Admin"}[role] || role || "Adhérent");
+const isAdminRole = (role) => role === "admin";
+const isReviewerRole = (role) => role === "admin" || role === "tresorier";
+
 function render(){
   const app = el("#app");
   if (state.loading){
@@ -171,35 +180,37 @@ function render(){
   app.innerHTML = renderShell();
   bindShellEvents();
 }
+
 /* ---------------- LOGIN / SIGNUP ---------------- */
 function renderLogin(){
   const isSignup = state.authMode === "signup";
   return `
-  <div class="login-wrap">
-    <div class="login-card">
-      <div class="brand"><img class="mark" src="assets/logo.png" alt="AQUAFIT" style="width:56px;height:56px;"><div><div class="name">AQUAFIT</div><div class="sub">Saint Aubin</div></div></div>
-      <p class="tag">Association Aquafit Saint Aubin — remboursement des frais de piscine des adhérents</p>
-      <form id="auth-form">
+<div class="login-wrap">
+<div class="login-card">
+<div class="brand"><img class="mark" src="assets/logo.png" alt="AQUAFIT" style="width:56px;height:56px;"><div><div class="name">AQUAFIT</div><div class="sub">Saint Aubin</div></div></div>
+<p class="tag">Association Aquafit Saint Aubin — remboursement des frais de piscine des adhérents</p>
+<form id="auth-form">
         ${isSignup ? `
-        <label>Prénom</label><input type="text" id="f-firstname" required>
-        <label>Nom</label><input type="text" id="f-lastname" required>
-        ` : ""}
-        <label>Email</label><input type="text" id="f-email" required>
-        <label>Mot de passe</label><input type="password" id="f-password" required minlength="6">
-        <div style="margin-top:20px;">
-          <button type="submit" class="btn btn-primary" id="auth-submit" style="width:100%;justify-content:center;">
+<label>Prénom</label><input type="text" id="f-firstname" required>
+<label>Nom</label><input type="text" id="f-lastname" required>
+` : ""}
+<label>Email</label><input type="text" id="f-email" required>
+<label>Mot de passe</label><input type="password" id="f-password" required minlength="6">
+<div style="margin-top:20px;">
+<button type="submit" class="btn btn-primary" id="auth-submit" style="width:100%;justify-content:center;">
             ${isSignup ? "Créer mon compte" : "Se connecter"}
-          </button>
-        </div>
-      </form>
+</button>
+</div>
+</form>
       ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ""}
-      <div class="switch-mode">
+<div class="switch-mode">
         ${isSignup ? "Déjà inscrit ?" : "Pas encore de compte ?"}
-        <button id="switch-mode-btn">${isSignup ? "Se connecter" : "Créer un compte"}</button>
-      </div>
-    </div>
-  </div>`;
+<button id="switch-mode-btn">${isSignup ? "Se connecter" : "Créer un compte"}</button>
+</div>
+</div>
+</div>`;
 }
+
 function bindLoginEvents(){
   el("#switch-mode-btn").onclick = () => {
     state.authMode = state.authMode === "login" ? "signup" : "login";
@@ -218,7 +229,7 @@ function bindLoginEvents(){
         const first_name = el("#f-firstname").value.trim();
         const last_name = el("#f-lastname").value.trim();
         const { error } = await sb.auth.signUp({
-          email, password,
+email, password,
           options: { data: { first_name, last_name } }
         });
         if (error) throw error;
@@ -238,45 +249,51 @@ function bindLoginEvents(){
     }
   };
 }
+
 function translateAuthError(msg){
   if (/invalid login credentials/i.test(msg)) return "Email ou mot de passe incorrect.";
   if (/already registered/i.test(msg)) return "Un compte existe déjà avec cet email.";
   return msg;
 }
+
 /* ---------------- SHELL ---------------- */
 function renderShell(){
-  const isAdmin = state.profile?.role === "admin";
+  const role = state.profile?.role;
+  const isReviewer = isReviewerRole(role);
   return `
-  <header class="topbar">
-    <div class="brand">
-      <img class="mark" src="assets/logo.png" alt="AQUAFIT">
-      <div><div class="name">AQUAFIT</div><div class="sub">Saint Aubin</div></div>
-    </div>
-    <div class="who">
-      <span>${state.profile?.first_name || ""} ${state.profile?.last_name || ""}</span>
-      <span class="role-pill">${isAdmin ? "Trésorière / Admin" : "Adhérent"}</span>
-      <button class="logout-btn" id="logout-btn">Déconnexion</button>
-    </div>
-  </header>
-  <main>
-    <div class="tabs">
-      <button class="tab ${state.view==='member'?'active':''}" data-view="member">Mes demandes</button>
-      <button class="tab ${state.view==='profile'?'active':''}" data-view="profile">Mon profil</button>
-      ${isAdmin ? `
-      <button class="tab ${state.view==='admin'?'active':''}" data-view="admin">Espace trésorière</button>
-      <button class="tab ${state.view==='members'?'active':''}" data-view="members">Adhérents</button>
-      ` : ""}
-    </div>
-    ${renderCurrentView(isAdmin)}
-  </main>
-  `;
+<header class="topbar">
+<div class="brand">
+<img class="mark" src="assets/logo.png" alt="AQUAFIT">
+<div><div class="name">AQUAFIT</div><div class="sub">Saint Aubin</div></div>
+</div>
+<div class="who">
+<span>${state.profile?.first_name || ""} ${state.profile?.last_name || ""}</span>
+<span class="role-pill">${roleLabel(role)}</span>
+<button class="logout-btn" id="logout-btn">Déconnexion</button>
+</div>
+</header>
+<main>
+<div class="tabs">
+<button class="tab ${state.view==='member'?'active':''}" data-view="member">Mes demandes</button>
+<button class="tab ${state.view==='profile'?'active':''}" data-view="profile">Mon profil</button>
+      ${isReviewer ? `
+<button class="tab ${state.view==='admin'?'active':''}" data-view="admin">Espace trésorière</button>
+<button class="tab ${state.view==='members'?'active':''}" data-view="members">Adhérents</button>
+` : ""}
+</div>
+    ${renderCurrentView(role)}
+</main>
+`;
 }
-function renderCurrentView(isAdmin){
-  if (state.view === "admin" && isAdmin) return renderAdminView();
-  if (state.view === "members" && isAdmin) return renderMembersView();
+
+function renderCurrentView(role){
+  const isReviewer = isReviewerRole(role);
+  if (state.view === "admin" && isReviewer) return renderAdminView();
+  if (state.view === "members" && isReviewer) return renderMembersView();
   if (state.view === "profile") return renderProfileView();
   return renderMemberView();
 }
+
 function bindShellEvents(){
   el("#logout-btn").onclick = async () => { await sb.auth.signOut(); state.session=null; state.profile=null; render(); };
   document.querySelectorAll(".tab").forEach(t => t.onclick = async () => {
@@ -289,61 +306,73 @@ function bindShellEvents(){
   if (state.view === "members") bindMembersEvents();
   if (state.view === "profile") bindProfileEvents();
 }
+
 /* ---------------- MEMBER VIEW ---------------- */
 function renderMemberView(){
   const mine = state.requests.filter(r => r.member_id === state.profile.id);
   return `
-  <div class="card">
-    <h2>Nouvelle demande de remboursement</h2>
-    <p class="hint">Plafond de remboursement : ${PLAFOND} € sur justificatif. Dépose ta facture, le montant est lu automatiquement.</p>
-    <form id="new-request-form">
-      <label>Activité / motif</label>
-      <input type="text" id="r-label" placeholder="Ex : Abonnement piscine — trimestre 1 2026" required>
-      <label>Précision (optionnel)</label>
-      <textarea id="r-desc" placeholder="Détails complémentaires…"></textarea>
-      <label>Justificatif (PDF, JPG, PNG)</label>
-      <div class="file-drop" id="file-drop">
-        <input type="file" id="r-file" accept="application/pdf,image/*" style="display:none;">
-        <div id="file-drop-text">Clique pour choisir un fichier, ou glisse-le ici</div>
-      </div>
-      <div id="ai-result-box"></div>
-      <div style="margin-top:20px;">
-        <button type="submit" class="btn btn-primary" id="submit-request-btn" disabled>Envoyer la demande</button>
-      </div>
-    </form>
-  </div>
-  <div class="card">
-    <h2>Historique de mes demandes</h2>
+<div class="card">
+<h2>Nouvelle demande de remboursement</h2>
+<p class="hint">Plafond de remboursement : ${fmtEUR(state.plafond)} sur justificatif. Dépose ta facture, le montant est lu automatiquement.</p>
+<form id="new-request-form">
+<label>Activité / motif</label>
+<input type="text" id="r-label" placeholder="Ex : Abonnement piscine — trimestre 1 2026" required>
+<label>Précision (optionnel)</label>
+<textarea id="r-desc" placeholder="Détails complémentaires…"></textarea>
+<label>Justificatif (PDF, JPG, PNG)</label>
+<div class="file-drop" id="file-drop">
+<input type="file" id="r-file" accept="application/pdf,image/*" style="display:none;">
+<div id="file-drop-text">Clique pour choisir un fichier, ou glisse-le ici</div>
+</div>
+<div id="ai-result-box"></div>
+<div style="margin-top:20px;">
+<button type="submit" class="btn btn-primary" id="submit-request-btn" disabled>Envoyer la demande</button>
+</div>
+</form>
+</div>
+<div class="card">
+<h2>Historique de mes demandes</h2>
     ${mine.length === 0 ? `<div class="empty">Aucune demande pour le moment.</div>` : `
-    <div class="req-list">
+<div class="req-list">
       ${mine.map(renderMemberRequestItem).join("")}
-    </div>
-    `}
-  </div>
-  `;
+</div>
+`}
+</div>
+`;
 }
+
 function renderMemberRequestItem(r){
   const amount = r.confirmed_amount ?? r.ai_extracted_amount;
-  const pct = amount ? Math.min(100, (Math.min(amount, PLAFOND) / PLAFOND) * 100) : 0;
+  const plafond = state.plafond;
+  const pct = amount ? Math.min(100, (Math.min(amount, plafond) / plafond) * 100) : 0;
+  const isPending = r.status === "pending";
   return `
-  <div class="req-item">
-    <div class="top">
-      <div>
-        <div class="title">${r.activity_label}</div>
-        <div class="meta">Déposé le ${fmtDate(r.submitted_at)}${r.ai_vendor ? " · " + r.ai_vendor : ""}</div>
-      </div>
-      <span class="status-badge status-${r.status}">${statusLabel(r.status)}</span>
-    </div>
+<div class="req-item">
+<div class="top">
+<div>
+<div class="title">${r.activity_label}</div>
+<div class="meta">Déposé le ${fmtDate(r.submitted_at)}${r.ai_vendor ? " · " + r.ai_vendor : ""}</div>
+</div>
+<span class="status-badge status-${r.status}">${statusLabel(r.status)}</span>
+</div>
     ${amount != null ? `
-    <div class="gauge-label"><span>Montant facture : ${fmtEUR(amount)}</span><span>Remboursé : ${fmtEUR(r.reimbursed_amount)}</span></div>
-    <div class="gauge"><div class="gauge-fill ${amount>=PLAFOND?'capped':''}" style="width:${pct}%"></div></div>
-    ` : `<div class="meta" style="margin-top:8px;color:var(--red);">Montant en cours de vérification par la trésorière.</div>`}
-  </div>
-  `;
+<div class="gauge-label"><span>Montant facture : ${fmtEUR(amount)}</span><span>Remboursé : ${fmtEUR(r.reimbursed_amount)}</span></div>
+<div class="gauge"><div class="gauge-fill ${amount>=plafond?'capped':''}" style="width:${pct}%"></div></div>
+` : `<div class="meta" style="margin-top:8px;color:var(--red);">Montant en cours de vérification par la trésorière.</div>`}
+    ${isPending ? `
+<div style="display:flex;gap:8px;margin-top:12px;">
+<button class="btn btn-ghost btn-sm edit-request-btn" data-id="${r.id}">Modifier</button>
+<button class="btn btn-danger btn-sm withdraw-request-btn" data-id="${r.id}">Retirer</button>
+</div>
+` : ""}
+</div>
+`;
 }
+
 function statusLabel(s){
   return {pending:"En attente", approved:"Validé", rejected:"Refusé", paid:"Payé"}[s] || s;
 }
+
 function bindMemberEvents(){
   const drop = el("#file-drop");
   const input = el("#r-file");
@@ -361,7 +390,58 @@ function bindMemberEvents(){
     if (!state.pendingFile){ alert("Ajoute d'abord un justificatif."); return; }
     await submitRequest();
   };
+  document.querySelectorAll(".edit-request-btn").forEach(b => b.onclick = () => openEditRequestModal(b.dataset.id));
+  document.querySelectorAll(".withdraw-request-btn").forEach(b => b.onclick = () => withdrawRequest(b.dataset.id));
 }
+
+function openEditRequestModal(id){
+  const r = state.requests.find(x => x.id === id);
+  if (!r) return;
+  const modalHtml = `
+<div class="modal-backdrop" id="edit-request-modal">
+<div class="modal">
+<button class="close" id="close-edit-request-modal">✕</button>
+<h3>Modifier ma demande</h3>
+<p class="hint" style="margin-top:-4px;">Le justificatif déjà déposé n'est pas modifiable ici — retire la demande et refais un envoi si le fichier est faux.</p>
+<label>Activité / motif</label>
+<input type="text" id="er-label" value="${(r.activity_label || "").replace(/"/g,'&quot;')}">
+<label>Précision (optionnel)</label>
+<textarea id="er-desc">${r.description || ""}</textarea>
+<div id="edit-request-msg"></div>
+<div style="margin-top:18px;">
+<button class="btn btn-primary btn-sm" id="save-edit-request-btn">Enregistrer</button>
+</div>
+</div>
+</div>
+`;
+  document.body.insertAdjacentHTML("beforeend", modalHtml);
+  el("#close-edit-request-modal").onclick = () => el("#edit-request-modal").remove();
+  el("#save-edit-request-btn").onclick = async () => {
+    const label = el("#er-label").value.trim();
+    if (!label){ el("#edit-request-msg").innerHTML = `<div class="error-msg">Le motif ne peut pas être vide.</div>`; return; }
+    const { error } = await sb.from("reimbursement_requests").update({
+      activity_label: label,
+      description: el("#er-desc").value.trim(),
+    }).eq("id", r.id);
+    if (error){ el("#edit-request-msg").innerHTML = `<div class="error-msg">${error.message}</div>`; return; }
+    el("#edit-request-modal").remove();
+    await loadRequests();
+    render();
+  };
+}
+
+async function withdrawRequest(id){
+  const r = state.requests.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm("Retirer cette demande ? Cette action est définitive.")) return;
+  const { error } = await sb.from("reimbursement_requests").delete().eq("id", id);
+  if (error){ alert("Erreur : " + error.message); return; }
+  // nettoyage best-effort du justificatif dans le storage
+  await sb.storage.from("justificatifs").remove([r.invoice_file_path]);
+  await loadRequests();
+  render();
+}
+
 async function analyzeInvoice(file){
   state.analyzing = true;
   el("#ai-result-box").innerHTML = `<div class="ai-box">Analyse du document en cours…</div>`;
@@ -379,8 +459,8 @@ async function analyzeInvoice(file){
     } catch(parseErr){
       throw new Error(
         res.status === 404
-          ? "Fonction d'analyse introuvable (le site est-il bien déployé sur Netlify, pas ouvert en local ?)"
-          : `Réponse inattendue du serveur (code ${res.status}). Vérifie que GEMINI_API_KEY est bien configurée sur Netlify.`
+? "Fonction d'analyse introuvable (le site est-il bien déployé sur Netlify, pas ouvert en local ?)"
+: `Réponse inattendue du serveur (code ${res.status}). Vérifie que GEMINI_API_KEY est bien configurée sur Netlify.`
       );
     }
     state.aiResult = data;
@@ -393,6 +473,7 @@ async function analyzeInvoice(file){
     state.analyzing = false;
   }
 }
+
 function renderAiBox(data){
   if (data.error){
     el("#ai-result-box").innerHTML = `<div class="error-msg">Erreur API : ${data.error}${data.detail ? " — " + String(data.detail).slice(0,300) : ""}</div>`;
@@ -400,43 +481,55 @@ function renderAiBox(data){
   }
   if (data.amount == null){
     el("#ai-result-box").innerHTML = `<div class="ai-box"><div class="row"><span class="label">Lecture automatique</span><span class="ai-badge low">Échec</span></div>
-    <div class="row" style="color:var(--muted);">${data.notes || "Montant non détecté, vérification manuelle par la trésorière."}</div></div>`;
+<div class="row" style="color:var(--muted);">${data.notes || "Montant non détecté, vérification manuelle par la trésorière."}</div></div>`;
     return;
   }
+  const reimbursedPreview = Math.min(data.amount, state.plafond);
+  let membershipWarning = "";
+  if (data.invoice_date && state.profile.membership_date && data.invoice_date < state.profile.membership_date){
+    membershipWarning = `<div class="warn-msg">⚠️ Cette facture est datée d'avant ta date d'adhésion (${fmtDate(state.profile.membership_date)}). Vérifie la date, la trésorière pourra la refuser.</div>`;
+  }
   el("#ai-result-box").innerHTML = `
-  <div class="ai-box">
-    <div class="row"><span class="label">Montant détecté</span><strong>${fmtEUR(data.amount)}</strong></div>
-    <div class="row"><span class="label">Montant remboursable (plafond ${PLAFOND} €)</span><strong>${fmtEUR(data.reimbursed_amount)}</strong></div>
+<div class="ai-box">
+<div class="row"><span class="label">Montant détecté</span><strong>${fmtEUR(data.amount)}</strong></div>
+<div class="row"><span class="label">Montant remboursable (plafond ${fmtEUR(state.plafond)})</span><strong>${fmtEUR(reimbursedPreview)}</strong></div>
     ${data.vendor ? `<div class="row"><span class="label">Fournisseur</span><span>${data.vendor}</span></div>` : ""}
     ${data.invoice_date ? `<div class="row"><span class="label">Date facture</span><span>${fmtDate(data.invoice_date)}</span></div>` : ""}
-    <div class="row"><span class="label">Fiabilité de la lecture</span><span class="ai-badge ${data.confidence||'low'}">${data.confidence||'low'}</span></div>
-  </div>`;
+<div class="row"><span class="label">Fiabilité de la lecture</span><span class="ai-badge ${data.confidence||'low'}">${data.confidence||'low'}</span></div>
+</div>
+    ${membershipWarning}`;
 }
+
 /* ---------------- MON PROFIL (adhérent) ---------------- */
 function renderProfileView(){
   const p = state.profile;
   return `
-  <div class="card" style="max-width:480px;">
-    <h2>Mon profil</h2>
-    <p class="hint">Ces coordonnées bancaires servent uniquement à la trésorière pour te rembourser. Elles ne sont visibles que par toi et les admins.</p>
-    <form id="profile-form">
-      <label>Prénom</label><input type="text" id="p-firstname" value="${p.first_name || ""}" required>
-      <label>Nom</label><input type="text" id="p-lastname" value="${p.last_name || ""}" required>
-      <label>IBAN</label><input type="text" id="p-iban" value="${p.iban || ""}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX">
-      <label>BIC</label><input type="text" id="p-bic" value="${p.bic || ""}" placeholder="Ex : AGRIFRPP123">
-      <div id="profile-msg"></div>
-      <div style="margin-top:18px;">
-        <button type="submit" class="btn btn-primary" id="profile-submit">Enregistrer</button>
-      </div>
-    </form>
-  </div>
-  `;
+<div class="card" style="max-width:480px;">
+<h2>Mon profil</h2>
+<p class="hint">Ces coordonnées bancaires servent uniquement à la trésorière pour te rembourser. Elles ne sont visibles que par toi et la trésorerie.</p>
+<form id="profile-form">
+<label>Prénom</label><input type="text" id="p-firstname" value="${p.first_name || ""}" required>
+<label>Nom</label><input type="text" id="p-lastname" value="${p.last_name || ""}" required>
+<label>Date d'adhésion</label>
+<input type="date" id="p-membership-date" value="${p.membership_date || ""}">
+<div class="hint" style="margin:4px 0 0;">Sert à vérifier que tes factures sont bien postérieures à ton inscription.</div>
+<label>IBAN</label><input type="text" id="p-iban" value="${p.iban || ""}" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX">
+<label>BIC</label><input type="text" id="p-bic" value="${p.bic || ""}" placeholder="Ex : AGRIFRPP123">
+<div id="profile-msg"></div>
+<div style="margin-top:18px;">
+<button type="submit" class="btn btn-primary" id="profile-submit">Enregistrer</button>
+</div>
+</form>
+</div>
+`;
 }
+
 function isPlausibleIban(v){
   const clean = (v || "").replace(/\s+/g, "").toUpperCase();
   if (!clean) return true; // champ optionnel
   return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(clean);
 }
+
 function bindProfileEvents(){
   el("#profile-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -453,6 +546,7 @@ function bindProfileEvents(){
     const { error } = await sb.from("profiles").update({
       first_name: el("#p-firstname").value.trim(),
       last_name: el("#p-lastname").value.trim(),
+      membership_date: el("#p-membership-date").value || null,
       iban: iban.replace(/\s+/g, "").toUpperCase() || null,
       bic: bic.toUpperCase() || null,
     }).eq("id", state.profile.id);
@@ -467,65 +561,81 @@ function bindProfileEvents(){
     render();
   };
 }
-/* ---------------- ADHÉRENTS (admin) ---------------- */
+
+/* ---------------- ADHÉRENTS (admin / trésorier) ---------------- */
 async function loadProfiles(){
   const { data, error } = await sb.from("profiles").select("*").order("last_name");
   if (!error) state.profiles = data;
 }
+
 function renderMembersView(){
   const list = state.profiles || [];
+  const role = state.profile.role;
+  const isAdmin = isAdminRole(role);
   return `
-  <div class="card" style="padding:0;overflow:auto;">
-    <div style="padding:20px 24px 0;"><h2>Adhérents</h2><p class="hint">Coordonnées bancaires saisies par chaque adhérent — la trésorière peut corriger si besoin.</p></div>
+<div class="card" style="padding:0;overflow:auto;">
+<div style="padding:20px 24px 0;"><h2>Adhérents</h2><p class="hint">Coordonnées bancaires et date d'adhésion — corrigeables ici.${isAdmin ? " La gestion des rôles (bureau / trésorier / admin) se fait aussi depuis cet écran." : ""}</p></div>
     ${list.length === 0 ? `<div class="empty">Aucun adhérent.</div>` : `
-    <table>
-      <thead><tr><th>Nom</th><th>Email</th><th>IBAN</th><th>BIC</th><th>Rôle</th><th></th></tr></thead>
-      <tbody>
+<table>
+<thead><tr><th>Nom</th><th>Email</th><th>Adhésion</th><th>IBAN</th><th>BIC</th><th>Rôle</th><th></th></tr></thead>
+<tbody>
         ${list.map(m => `
-        <tr>
-          <td>${m.first_name} ${m.last_name}</td>
-          <td>${m.email}</td>
-          <td>${m.iban ? maskIban(m.iban) : "<span style='color:var(--red);'>non renseigné</span>"}</td>
-          <td>${m.bic || "—"}</td>
-          <td>${m.role === "admin" ? "Trésorière/Admin" : "Adhérent"}</td>
-          <td><button class="btn btn-ghost btn-sm edit-member-btn" data-id="${m.id}">Modifier</button></td>
-        </tr>
-        `).join("")}
-      </tbody>
-    </table>
-    `}
-  </div>
-  `;
+<tr>
+<td>${m.first_name} ${m.last_name}</td>
+<td>${m.email}</td>
+<td>${m.membership_date ? fmtDate(m.membership_date) : "<span style='color:var(--red);'>non renseignée</span>"}</td>
+<td>${m.iban ? maskIban(m.iban) : "<span style='color:var(--red);'>non renseigné</span>"}</td>
+<td>${m.bic || "—"}</td>
+<td>${roleLabel(m.role)}</td>
+<td><button class="btn btn-ghost btn-sm edit-member-btn" data-id="${m.id}">Modifier</button></td>
+</tr>
+`).join("")}
+</tbody>
+</table>
+`}
+</div>
+`;
 }
+
 function maskIban(iban){
   const clean = iban.replace(/\s+/g,"");
   return clean.slice(0,4) + " •••• •••• " + clean.slice(-4);
 }
+
 function bindMembersEvents(){
   document.querySelectorAll(".edit-member-btn").forEach(b => b.onclick = () => openMemberEditModal(b.dataset.id));
 }
+
 function openMemberEditModal(id){
   const m = (state.profiles || []).find(x => x.id === id);
   if (!m) return;
+  const isAdmin = isAdminRole(state.profile.role);
   const modalHtml = `
-  <div class="modal-backdrop" id="member-modal">
-    <div class="modal">
-      <button class="close" id="close-member-modal">✕</button>
-      <h3>${m.first_name} ${m.last_name}</h3>
-      <label>IBAN</label><input type="text" id="m-iban" value="${m.iban || ""}">
-      <label>BIC</label><input type="text" id="m-bic" value="${m.bic || ""}">
-      <label>Rôle</label>
-      <select id="m-role">
-        <option value="member" ${m.role==="member"?"selected":""}>Adhérent</option>
-        <option value="admin" ${m.role==="admin"?"selected":""}>Trésorière / Admin</option>
-      </select>
-      <div id="member-modal-msg"></div>
-      <div style="margin-top:18px;">
-        <button class="btn btn-primary btn-sm" id="save-member-btn">Enregistrer</button>
-      </div>
-    </div>
-  </div>
-  `;
+<div class="modal-backdrop" id="member-modal">
+<div class="modal">
+<button class="close" id="close-member-modal">✕</button>
+<h3>${m.first_name} ${m.last_name}</h3>
+<label>Date d'adhésion</label>
+<input type="date" id="m-membership-date" value="${m.membership_date || ""}">
+<label>IBAN</label><input type="text" id="m-iban" value="${m.iban || ""}">
+<label>BIC</label><input type="text" id="m-bic" value="${m.bic || ""}">
+    ${isAdmin ? `
+<label>Rôle</label>
+<select id="m-role">
+<option value="member" ${m.role==="member"?"selected":""}>Adhérent</option>
+<option value="bureau" ${m.role==="bureau"?"selected":""}>Membre du bureau</option>
+<option value="tresorier" ${m.role==="tresorier"?"selected":""}>Trésorier</option>
+<option value="admin" ${m.role==="admin"?"selected":""}>Admin</option>
+</select>
+<div class="hint" style="margin:4px 0 0;">Seul un admin peut modifier les rôles, y compris promouvoir un autre admin.</div>
+` : ""}
+<div id="member-modal-msg"></div>
+<div style="margin-top:18px;">
+<button class="btn btn-primary btn-sm" id="save-member-btn">Enregistrer</button>
+</div>
+</div>
+</div>
+`;
   document.body.insertAdjacentHTML("beforeend", modalHtml);
   el("#close-member-modal").onclick = () => el("#member-modal").remove();
   el("#save-member-btn").onclick = async () => {
@@ -535,17 +645,20 @@ function openMemberEditModal(id){
       el("#member-modal-msg").innerHTML = `<div class="error-msg">Format d'IBAN qui semble incorrect.</div>`;
       return;
     }
-    const { error } = await sb.from("profiles").update({
+    const payload = {
+      membership_date: el("#m-membership-date").value || null,
       iban: iban.replace(/\s+/g,"").toUpperCase() || null,
       bic: bic.toUpperCase() || null,
-      role: el("#m-role").value,
-    }).eq("id", m.id);
+    };
+    if (isAdmin) payload.role = el("#m-role").value;
+    const { error } = await sb.from("profiles").update(payload).eq("id", m.id);
     if (error){ el("#member-modal-msg").innerHTML = `<div class="error-msg">${error.message}</div>`; return; }
     el("#member-modal").remove();
     await loadProfiles();
     render();
   };
 }
+
 function fileToBase64(file){
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -554,6 +667,7 @@ function fileToBase64(file){
     r.readAsDataURL(file);
   });
 }
+
 async function submitRequest(){
   const btn = el("#submit-request-btn");
   btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
@@ -585,80 +699,110 @@ async function submitRequest(){
     btn.disabled = false; btn.textContent = "Envoyer la demande";
   }
 }
-/* ---------------- ADMIN VIEW ---------------- */
+
+/* ---------------- ADMIN VIEW (trésorerie) ---------------- */
 function renderAdminView(){
   const filtered = state.requests.filter(r => state.filterStatus === "all" || r.status === state.filterStatus);
   return `
-  <div class="toolbar">
-    <div class="filters">
-      <select id="status-filter">
+<div class="card" style="max-width:360px;">
+<h2>Plafond de remboursement</h2>
+<p class="hint">Montant maximum remboursé par demande. Modifiable par l'admin ou le trésorier — s'applique aux nouvelles demandes traitées, pas rétroactivement.</p>
+<div style="display:flex;gap:10px;align-items:center;">
+<input type="number" step="0.01" min="0" id="plafond-input" value="${state.plafond}" style="max-width:140px;">
+<button class="btn btn-primary btn-sm" id="save-plafond-btn">Enregistrer</button>
+</div>
+<div id="plafond-msg"></div>
+</div>
+<div class="toolbar">
+<div class="filters">
+<select id="status-filter">
         ${["all","pending","approved","rejected","paid"].map(s =>
           `<option value="${s}" ${state.filterStatus===s?"selected":""}>${s==="all"?"Tous les statuts":statusLabel(s)}</option>`
         ).join("")}
-      </select>
-    </div>
-    <button class="btn btn-ghost btn-sm" id="export-csv-btn">Exporter virements (CSV)</button>
-  </div>
-  <div class="card" style="padding:0;overflow:auto;">
+</select>
+</div>
+<button class="btn btn-ghost btn-sm" id="export-csv-btn">Exporter virements (CSV)</button>
+</div>
+<div class="card" style="padding:0;overflow:auto;">
     ${filtered.length === 0 ? `<div class="empty">Aucune demande.</div>` : `
-    <table>
-      <thead><tr>
-        <th>Adhérent</th><th>Activité</th><th>Déposé le</th><th>Montant facture</th>
-        <th>Remboursé</th><th>Statut</th><th></th>
-      </tr></thead>
-      <tbody>
+<table>
+<thead><tr>
+<th>Adhérent</th><th>Activité</th><th>Déposé le</th><th>Montant facture</th>
+<th>Remboursé</th><th>Statut</th><th></th>
+</tr></thead>
+<tbody>
         ${filtered.map(r => `
-        <tr>
-          <td>${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""}</td>
-          <td>${r.activity_label}</td>
-          <td>${fmtDate(r.submitted_at)}</td>
-          <td>${fmtEUR(r.confirmed_amount ?? r.ai_extracted_amount)}</td>
-          <td>${fmtEUR(r.reimbursed_amount)}</td>
-          <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
-          <td><button class="btn btn-ghost btn-sm review-btn" data-id="${r.id}">Examiner</button></td>
-        </tr>
-        `).join("")}
-      </tbody>
-    </table>
-    `}
-  </div>
-  `;
+<tr>
+<td>${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""}</td>
+<td>${r.activity_label}</td>
+<td>${fmtDate(r.submitted_at)}</td>
+<td>${fmtEUR(r.confirmed_amount ?? r.ai_extracted_amount)}</td>
+<td>${fmtEUR(r.reimbursed_amount)}</td>
+<td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
+<td><button class="btn btn-ghost btn-sm review-btn" data-id="${r.id}">Examiner</button></td>
+</tr>
+`).join("")}
+</tbody>
+</table>
+`}
+</div>
+`;
 }
+
 function bindAdminEvents(){
   el("#status-filter").onchange = (e) => { state.filterStatus = e.target.value; render(); };
   el("#export-csv-btn").onclick = exportPaymentsCsv;
   document.querySelectorAll(".review-btn").forEach(b => b.onclick = () => openReviewModal(b.dataset.id));
+  const plafondBtn = el("#save-plafond-btn");
+  if (plafondBtn) plafondBtn.onclick = async () => {
+    const val = parseFloat(el("#plafond-input").value);
+    const msgBox = el("#plafond-msg");
+    if (isNaN(val) || val <= 0){ msgBox.innerHTML = `<div class="error-msg">Montant invalide.</div>`; return; }
+    plafondBtn.disabled = true; plafondBtn.innerHTML = `<span class="spinner"></span>`;
+    const { error } = await sb.from("settings").update({ value_numeric: val }).eq("key", "plafond_remboursement");
+    plafondBtn.disabled = false; plafondBtn.textContent = "Enregistrer";
+    if (error){ msgBox.innerHTML = `<div class="error-msg">${error.message}</div>`; return; }
+    state.plafond = val;
+    msgBox.innerHTML = `<div class="success-msg">Plafond mis à jour.</div>`;
+  };
 }
+
 async function openReviewModal(id){
   const r = state.requests.find(x => x.id === id);
   if (!r) return;
   const { data: signed } = await sb.storage.from("justificatifs").createSignedUrl(r.invoice_file_path, 300);
   const fileUrl = signed?.signedUrl || "#";
+  const membershipDate = r.profiles?.membership_date;
+  const membershipWarning = (r.ai_invoice_date && membershipDate && r.ai_invoice_date < membershipDate)
+    ? `<div class="warn-msg">⚠️ Facture datée du ${fmtDate(r.ai_invoice_date)}, soit avant la date d'adhésion (${fmtDate(membershipDate)}) de l'adhérent.</div>`
+    : "";
   const modalHtml = `
-  <div class="modal-backdrop" id="review-modal">
-    <div class="modal">
-      <button class="close" id="close-modal">✕</button>
-      <h3>${r.activity_label}</h3>
-      <div class="meta" style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+<div class="modal-backdrop" id="review-modal">
+<div class="modal">
+<button class="close" id="close-modal">✕</button>
+<h3>${r.activity_label}</h3>
+<div class="meta" style="color:var(--muted);font-size:13px;margin-bottom:14px;">
         ${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""} · déposé le ${fmtDate(r.submitted_at)}
-      </div>
-      <a href="${fileUrl}" target="_blank" class="btn btn-ghost btn-sm">Voir le justificatif ↗</a>
-      <label>Montant confirmé (€)</label>
-      <input type="number" step="0.01" id="confirmed-amount" value="${r.confirmed_amount ?? r.ai_extracted_amount ?? ''}">
-      <div class="meta" style="font-size:12px;color:var(--muted);margin-top:4px;">
-        Montant lu par l'IA : ${fmtEUR(r.ai_extracted_amount)} (fiabilité : ${r.ai_confidence || "n/a"})<br>
-        Remboursement plafonné appliqué automatiquement à ${PLAFOND} €.
-      </div>
-      <label>Note interne (optionnel)</label>
-      <textarea id="admin-notes">${r.admin_notes || ""}</textarea>
-      <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
-        <button class="btn btn-success btn-sm" id="approve-btn">Valider</button>
-        <button class="btn btn-danger btn-sm" id="reject-btn">Refuser</button>
+        ${membershipDate ? " · adhérent depuis le " + fmtDate(membershipDate) : ""}
+</div>
+    ${membershipWarning}
+<a href="${fileUrl}" target="_blank" class="btn btn-ghost btn-sm">Voir le justificatif ↗</a>
+<label>Montant confirmé (€)</label>
+<input type="number" step="0.01" id="confirmed-amount" value="${r.confirmed_amount ?? r.ai_extracted_amount ?? ''}">
+<div class="meta" style="font-size:12px;color:var(--muted);margin-top:4px;">
+Montant lu par l'IA : ${fmtEUR(r.ai_extracted_amount)} (fiabilité : ${r.ai_confidence || "n/a"})<br>
+Remboursement plafonné appliqué automatiquement à ${fmtEUR(state.plafond)}.
+</div>
+<label>Note interne (optionnel)</label>
+<textarea id="admin-notes">${r.admin_notes || ""}</textarea>
+<div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+<button class="btn btn-success btn-sm" id="approve-btn">Valider</button>
+<button class="btn btn-danger btn-sm" id="reject-btn">Refuser</button>
         ${r.status === "approved" ? `<button class="btn btn-primary btn-sm" id="paid-btn">Marquer payé</button>` : ""}
-      </div>
-    </div>
-  </div>
-  `;
+</div>
+</div>
+</div>
+`;
   document.body.insertAdjacentHTML("beforeend", modalHtml);
   el("#close-modal").onclick = () => el("#review-modal").remove();
   el("#approve-btn").onclick = () => updateRequestStatus(r.id, "approved");
@@ -666,11 +810,12 @@ async function openReviewModal(id){
   const paidBtn = el("#paid-btn");
   if (paidBtn) paidBtn.onclick = () => updateRequestStatus(r.id, "paid");
 }
+
 async function updateRequestStatus(id, status){
   const confirmedAmount = parseFloat(el("#confirmed-amount").value) || null;
   const adminNotes = el("#admin-notes").value.trim();
   const payload = {
-    status,
+status,
     confirmed_amount: confirmedAmount,
     admin_notes: adminNotes,
     reviewed_by: state.profile.id,
@@ -683,6 +828,7 @@ async function updateRequestStatus(id, status){
   await loadRequests();
   render();
 }
+
 async function exportPaymentsCsv(){
   const { data, error } = await sb.from("v_payments_to_process").select("*");
   if (error){ alert("Erreur export : " + error.message); return; }
@@ -696,14 +842,21 @@ async function exportPaymentsCsv(){
   link.download = `aquafit_virements_${new Date().toISOString().slice(0,10)}.csv`;
   link.click();
 }
+
 /* ---------------- DATA LOADING ---------------- */
 async function loadRequests(){
   const { data, error } = await sb
     .from("reimbursement_requests")
-    .select("*, profiles:member_id(first_name, last_name)")
+    .select("*, profiles:member_id(first_name, last_name, membership_date)")
     .order("submitted_at", {ascending:false});
   if (!error) state.requests = data;
 }
+
+async function loadSettings(){
+  const { data, error } = await sb.from("settings").select("value_numeric").eq("key","plafond_remboursement").single();
+  if (!error && data && data.value_numeric != null) state.plafond = data.value_numeric;
+}
+
 async function bootstrap(){
   state.loading = true; render();
   const { data: { session } } = await sb.auth.getSession();
@@ -711,15 +864,18 @@ async function bootstrap(){
   if (session){
     const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
     state.profile = profile;
+    await loadSettings();
     await loadRequests();
   }
   state.loading = false;
   render();
 }
+
 sb.auth.onAuthStateChange((_event, session) => {
   state.session = session;
   if (!session){ state.profile = null; render(); }
 });
+
 bootstrap();
 </script>
 </body>
