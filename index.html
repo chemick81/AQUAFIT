@@ -298,7 +298,25 @@ email, password,
 function translateAuthError(msg){
   if (/invalid login credentials/i.test(msg)) return "Email ou mot de passe incorrect.";
   if (/already registered/i.test(msg)) return "Un compte existe déjà avec cet email.";
+  if (/oauth state not found|state not found|bad_oauth_state/i.test(msg)) return "La connexion Google a expiré ou a été interrompue (souvent lié au navigateur qui bloque le stockage local, ou à un double clic). Réessaie le bouton \"Continuer avec Google\".";
   return msg;
+}
+
+// Récupère une éventuelle erreur OAuth renvoyée dans l'URL (?error=...) après
+// un échec de redirection Google, l'affiche proprement, puis nettoie l'URL
+// pour éviter de la retraiter à un prochain rechargement de page.
+function consumeAuthErrorFromUrl(){
+  try{
+    const url = new URL(window.location.href);
+    const hashParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : "");
+    const err = url.searchParams.get("error") || hashParams.get("error");
+    const errDesc = url.searchParams.get("error_description") || hashParams.get("error_description");
+    if (err){
+      const raw = decodeURIComponent((errDesc || err).replace(/\+/g, " "));
+      state.authError = translateAuthError(raw);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  } catch(e){ /* ignore, pas bloquant */ }
 }
 
 /* ---------------- SHELL ---------------- */
@@ -934,21 +952,27 @@ async function loadSettings(){
 
 async function bootstrap(){
   state.loading = true; render();
-  const { data: { session } } = await sb.auth.getSession();
-  state.session = session;
-  if (session){
-    const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
-    state.profile = profile;
-    await loadSettings();
-    await loadRequests();
-    if (profile && !isProfileComplete(profile) && !state.profileAlertShown){
-      state.profileAlertShown = true;
-      const missing = missingProfileFields(profile).join(", ");
-      setTimeout(() => alert("Merci de compléter ton profil avant de pouvoir utiliser l'appli.\nChamps manquants : " + missing), 50);
+  try{
+    consumeAuthErrorFromUrl();
+    const { data: { session } } = await sb.auth.getSession();
+    state.session = session;
+    if (session){
+      const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
+      state.profile = profile;
+      await loadSettings();
+      await loadRequests();
+      if (profile && !isProfileComplete(profile) && !state.profileAlertShown){
+        state.profileAlertShown = true;
+        const missing = missingProfileFields(profile).join(", ");
+        setTimeout(() => alert("Merci de compléter ton profil avant de pouvoir utiliser l'appli.\nChamps manquants : " + missing), 50);
+      }
     }
+  } catch(err){
+    state.authError = "Erreur lors du chargement de la session : " + (err?.message || err);
+  } finally {
+    state.loading = false;
+    render();
   }
-  state.loading = false;
-  render();
 }
 
 sb.auth.onAuthStateChange((_event, session) => {
