@@ -918,8 +918,37 @@ status,
   const { error } = await sb.from("reimbursement_requests").update(payload).eq("id", id);
   if (error){ alert("Erreur : " + error.message); return; }
   el("#review-modal").remove();
+  notifyMemberByEmail(r, status, confirmedAmount, adminNotes);
   await loadRequests();
   render();
+}
+
+// Envoi de l'email de notification à l'adhérent (validation / refus / paiement).
+// Best-effort : une erreur ou une absence de configuration ne doit jamais
+// bloquer la trésorière dans son flux de validation.
+async function notifyMemberByEmail(request, status, confirmedAmount, adminNotes){
+  const toEmail = request?.profiles?.email;
+  if (!toEmail) return;
+  try {
+    const res = await fetch("/.netlify/functions/send-status-email", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        toEmail,
+        firstName: request.profiles?.first_name || "",
+        status,
+        activityLabel: request.activity_label,
+        amount: status === "rejected" ? null : (confirmedAmount ?? request.confirmed_amount ?? request.ai_extracted_amount ?? null),
+        adminNotes: adminNotes || null,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!data.sent && !data.skipped){
+      console.warn("Email de notification non envoyé :", data.error || data.detail || res.status);
+    }
+  } catch (err) {
+    console.warn("Email de notification non envoyé :", err.message);
+  }
 }
 
 async function exportPaymentsCsv(){
@@ -940,7 +969,7 @@ async function exportPaymentsCsv(){
 async function loadRequests(){
   const { data, error } = await sb
     .from("reimbursement_requests")
-    .select("*, profiles:member_id(first_name, last_name, membership_date)")
+    .select("*, profiles:member_id(first_name, last_name, membership_date, email)")
     .order("submitted_at", {ascending:false});
   if (!error) state.requests = data;
 }

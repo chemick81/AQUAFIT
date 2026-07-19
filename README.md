@@ -37,6 +37,23 @@ const SUPABASE_ANON_KEY = "ta-clé-anon";
 >
 > Google retire régulièrement ses anciens modèles (ex: `gemini-2.5-flash` a été retiré en 2026). En utilisant l'alias `gemini-flash-latest` dans `netlify/functions/analyze-invoice.js`, l'appli reste à jour automatiquement sans qu'il faille modifier le code. Si l'erreur "This model … is no longer available" réapparaît un jour, consulte https://ai.google.dev/gemini-api/docs/models pour le nom du modèle courant.
 
+## 4bis. Emails de notification (validation / refus / paiement)
+
+[#4bis-emails-de-notification-validation--refus--paiement](#4bis-emails-de-notification-validation--refus--paiement)
+
+Quand la trésorière valide, refuse ou marque payée une demande, l'adhérent reçoit automatiquement un email. On utilise **Brevo** (ex-Sendinblue) : gratuit jusqu'à 300 emails/jour, et surtout — contrairement à d'autres fournisseurs — il ne demande **pas** de configurer un nom de domaine (DNS), juste de valider une seule adresse d'expéditeur.
+
+1. Crée un compte gratuit sur <https://www.brevo.com>
+2. Menu **Expéditeurs, domaines et dédiés** → **Expéditeurs** → ajoute l'adresse qui enverra les emails (ex. `tresorerie@aquafit-saintaubin.fr`, ou même une adresse Gmail) → tu reçois un email de confirmation, clique dessus
+3. Menu **SMTP & API** → **Clés API** → crée une nouvelle clé API (v3), copie-la
+4. Sur Netlify → Site settings → Environment variables → ajoute :
+  - `BREVO_API_KEY` = la clé copiée à l'étape 3
+  - `BREVO_SENDER_EMAIL` = l'adresse validée à l'étape 2
+  - `BREVO_SENDER_NAME` = optionnel, ex. `AQUAFIT Saint Aubin` (sinon ce nom par défaut est utilisé)
+5. Redéploie le site (Netlify redéploie automatiquement dès qu'une variable d'environnement change, ou déclenche un "Trigger deploy" manuel)
+
+> Si la clé n'est pas configurée, l'appli continue de fonctionner normalement : la validation/refus/paiement se fait comme avant, seul l'email n'est pas envoyé (message dans la console navigateur, rien de bloquant pour la trésorière).
+
 ## 4. Premier admin (toi / la trésorière)
 
 1. Inscris-toi normalement sur l'appli (bouton "Créer un compte")
@@ -73,3 +90,4 @@ Le formulaire gère déjà la saisie de l'IBAN/BIC par l'adhérent lui-même, vi
 - RLS active partout : un adhérent ne voit que ses propres demandes ; l'IBAN/BIC n'est lisible que par son propriétaire et les admins
 - Le bucket `justificatifs` est privé, accès par URL signée temporaire uniquement
 - La clé Gemini reste côté serveur (fonction Netlify), jamais exposée au navigateur
+- Sous-traitants (hébergement / traitement de données) : Supabase (base de données + fichiers), Netlify (hébergement + fonctions), Google Gemini (lecture des factures), Brevo (envoi des emails de notification). Prénom, nom et email de l'adhérent transitent par Brevo pour l'envoi des emails ; aucune donnée bancaire (IBAN/BIC) n'y est envoyée.
