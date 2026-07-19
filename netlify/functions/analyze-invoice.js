@@ -24,8 +24,8 @@ const PLAFOND_FALLBACK = 150;
 
 // Mêmes valeurs publiques que dans index.html (clé anon = faite pour être
 // exposée côté client, ce n'est pas un secret).
-const SUPABASE_URL = "https://azlwteuimydrxeuqppdt.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6bHd0ZXVpbXlkcnhldXFwcGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODMzNjYsImV4cCI6MjA5OTk1OTM2Nn0.PYflJpIDP5HUegHsiZ2ELvRZ_UVXpsHrsxNXsEQpoLg";
+const SUPABASE_URL = "https://nesfcrrwbwjorplokjwu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lc2ZjcnJ3Yndqb3JwbG9rand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTU3MDcsImV4cCI6MjA5OTk3MTcwN30.KUZAhiXeqWc6w7G0XPZK4iuaAjaJd5bT-QKjBwUHSCA";
 
 async function fetchPlafond() {
   try {
