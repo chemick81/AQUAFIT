@@ -957,7 +957,19 @@ async function bootstrap(){
     const { data: { session } } = await sb.auth.getSession();
     state.session = session;
     if (session){
-      const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
+      const { data: profile, error: profileErr } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
+      if (profileErr || !profile){
+        // Le compte existe côté authentification mais son profil a été
+        // supprimé (ex. suppression manuelle de la ligne dans public.profiles
+        // sans supprimer l'utilisateur correspondant dans auth.users).
+        // On déconnecte proprement plutôt que de planter en essayant
+        // d'afficher un profil vide.
+        await sb.auth.signOut();
+        state.session = null;
+        state.profile = null;
+        state.authError = "Ce compte n'a plus de profil associé (il a peut-être été supprimé). Contacte l'administrateur, ou recrée un compte avec une autre adresse.";
+        return;
+      }
       state.profile = profile;
       await loadSettings();
       await loadRequests();
