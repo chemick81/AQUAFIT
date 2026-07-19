@@ -519,9 +519,13 @@ async function analyzeInvoice(file){
   el("#ai-result-box").innerHTML = `<div class="ai-box">Analyse du document en cours…</div>`;
   try{
     const base64Data = await fileToBase64(file);
-    const res = await fetch("/.netlify/functions/analyze-invoice", {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analyze-invoice`, {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "apikey": SUPABASE_ANON_KEY
+      },
       body: JSON.stringify({ base64Data, mediaType: file.type })
     });
     const rawText = await res.text();
@@ -930,9 +934,13 @@ async function notifyMemberByEmail(request, status, confirmedAmount, adminNotes)
   const toEmail = request?.profiles?.email;
   if (!toEmail) return;
   try {
-    const res = await fetch("/.netlify/functions/send-status-email", {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-status-email`, {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "apikey": SUPABASE_ANON_KEY
+      },
       body: JSON.stringify({
         toEmail,
         firstName: request.profiles?.first_name || "",
