@@ -54,6 +54,7 @@ main{max-width:1080px;margin:0 auto;padding:32px 24px 80px;}
 .tab{padding:10px 18px;border:none;background:none;font-size:14px;font-weight:600;
   color:var(--muted);border-bottom:2px solid transparent;}
 .tab.active{color:var(--navy);border-bottom-color:var(--accent);}
+.tab:disabled{opacity:.35;cursor:not-allowed;}
 .card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
 .card h2{margin:0 0 4px;font-size:20px;}
 .card .hint{color:var(--muted);font-size:13px;margin-bottom:18px;}
@@ -161,6 +162,7 @@ let state = {
   authError: "",
   filterStatus: "all",
   plafond: PLAFOND_DEFAULT,
+  profileAlertShown: false,
 };
 
 const el = (sel) => document.querySelector(sel);
@@ -169,6 +171,23 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
 const roleLabel = (role) => ({member:"Adhérent", bureau:"Membre du bureau", tresorier:"Trésorier", admin:"Admin"}[role] || role || "Adhérent");
 const isAdminRole = (role) => role === "admin";
 const isReviewerRole = (role) => role === "admin" || role === "tresorier";
+
+const PROFILE_REQUIRED_FIELDS = {
+  first_name: "Prénom",
+  last_name: "Nom",
+  membership_date: "Date d'adhésion",
+  iban: "IBAN",
+  bic: "BIC",
+};
+function missingProfileFields(p){
+  if (!p) return Object.values(PROFILE_REQUIRED_FIELDS);
+  return Object.entries(PROFILE_REQUIRED_FIELDS)
+    .filter(([key]) => !p[key] || !String(p[key]).trim())
+    .map(([, label]) => label);
+}
+function isProfileComplete(p){
+  return missingProfileFields(p).length === 0;
+}
 
 function render(){
   const app = el("#app");
@@ -286,6 +305,8 @@ function translateAuthError(msg){
 function renderShell(){
   const role = state.profile?.role;
   const isReviewer = isReviewerRole(role);
+  const incomplete = !isProfileComplete(state.profile);
+  if (incomplete && state.view !== "profile") state.view = "profile";
   return `
 <header class="topbar">
 <div class="brand">
@@ -300,19 +321,26 @@ function renderShell(){
 </header>
 <main>
 <div class="tabs">
-<button class="tab ${state.view==='member'?'active':''}" data-view="member">Mes demandes</button>
+<button class="tab ${state.view==='member'?'active':''}" data-view="member" ${incomplete ? "disabled" : ""}>Mes demandes</button>
 <button class="tab ${state.view==='profile'?'active':''}" data-view="profile">Mon profil</button>
       ${isReviewer ? `
-<button class="tab ${state.view==='admin'?'active':''}" data-view="admin">Espace trésorière</button>
-<button class="tab ${state.view==='members'?'active':''}" data-view="members">Adhérents</button>
+<button class="tab ${state.view==='admin'?'active':''}" data-view="admin" ${incomplete ? "disabled" : ""}>Espace trésorière</button>
+<button class="tab ${state.view==='members'?'active':''}" data-view="members" ${incomplete ? "disabled" : ""}>Adhérents</button>
 ` : ""}
 </div>
-    ${renderCurrentView(role)}
+    ${incomplete ? `
+<div class="card" style="border-color:var(--red);">
+<h2 style="color:var(--red);">Profil incomplet</h2>
+<p class="hint">Merci de renseigner : <strong>${missingProfileFields(state.profile).join(", ")}</strong>. Tu ne pourras pas déposer de demande de remboursement (ni accéder au reste de l'appli) tant que ton profil n'est pas complet.</p>
+</div>
+` : ""}
+    ${renderCurrentView(role, incomplete)}
 </main>
 `;
 }
 
-function renderCurrentView(role){
+function renderCurrentView(role, incomplete){
+  if (incomplete) return renderProfileView();
   const isReviewer = isReviewerRole(role);
   if (state.view === "admin" && isReviewer) return renderAdminView();
   if (state.view === "members" && isReviewer) return renderMembersView();
@@ -559,10 +587,25 @@ function isPlausibleIban(v){
 function bindProfileEvents(){
   el("#profile-form").onsubmit = async (e) => {
     e.preventDefault();
+    const firstName = el("#p-firstname").value.trim();
+    const lastName = el("#p-lastname").value.trim();
+    const membershipDate = el("#p-membership-date").value;
     const iban = el("#p-iban").value.trim();
     const bic = el("#p-bic").value.trim();
     const msgBox = el("#profile-msg");
     msgBox.innerHTML = "";
+
+    const missing = [];
+    if (!firstName) missing.push("Prénom");
+    if (!lastName) missing.push("Nom");
+    if (!membershipDate) missing.push("Date d'adhésion");
+    if (!iban) missing.push("IBAN");
+    if (!bic) missing.push("BIC");
+    if (missing.length > 0){
+      alert("Merci de compléter les champs suivants avant d'enregistrer : " + missing.join(", "));
+      return;
+    }
+
     if (!isPlausibleIban(iban)){
       msgBox.innerHTML = `<div class="error-msg">Format d'IBAN qui semble incorrect (ex attendu : FR76 1234 5678 ...). Corrige avant d'enregistrer.</div>`;
       return;
@@ -570,9 +613,9 @@ function bindProfileEvents(){
     const btn = el("#profile-submit");
     btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
     const { error } = await sb.from("profiles").update({
-      first_name: el("#p-firstname").value.trim(),
-      last_name: el("#p-lastname").value.trim(),
-      membership_date: el("#p-membership-date").value || null,
+      first_name: firstName,
+      last_name: lastName,
+      membership_date: membershipDate || null,
       iban: iban.replace(/\s+/g, "").toUpperCase() || null,
       bic: bic.toUpperCase() || null,
     }).eq("id", state.profile.id);
@@ -695,6 +738,12 @@ function fileToBase64(file){
 }
 
 async function submitRequest(){
+  if (!isProfileComplete(state.profile)){
+    alert("Ton profil doit être complet (prénom, nom, date d'adhésion, IBAN, BIC) avant de pouvoir déposer une demande de remboursement.");
+    state.view = "profile";
+    render();
+    return;
+  }
   const btn = el("#submit-request-btn");
   btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
   try{
@@ -892,6 +941,11 @@ async function bootstrap(){
     state.profile = profile;
     await loadSettings();
     await loadRequests();
+    if (profile && !isProfileComplete(profile) && !state.profileAlertShown){
+      state.profileAlertShown = true;
+      const missing = missingProfileFields(profile).join(", ");
+      setTimeout(() => alert("Merci de compléter ton profil avant de pouvoir utiliser l'appli.\nChamps manquants : " + missing), 50);
+    }
   }
   state.loading = false;
   render();
@@ -899,7 +953,7 @@ async function bootstrap(){
 
 sb.auth.onAuthStateChange((_event, session) => {
   state.session = session;
-  if (!session){ state.profile = null; render(); }
+  if (!session){ state.profile = null; state.profileAlertShown = false; render(); }
 });
 
 bootstrap();
