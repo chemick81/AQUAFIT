@@ -14,7 +14,38 @@
 // à chaque dépréciation. Si besoin de figer une version précise, voir la
 // liste à jour ici : https://ai.google.dev/gemini-api/docs/models
 
-const PLAFOND = 150; // Doit rester aligné avec PLAFOND dans index.html et supabase_schema.sql
+// Le plafond n'est plus figé en dur : il est lu dans la table Supabase
+// `settings` (clé 'plafond_remboursement'), modifiable par l'admin/trésorier
+// depuis l'appli. PLAFOND_FALLBACK ne sert que si cette lecture échoue
+// (ex. Supabase indisponible) — ça reste purement indicatif : le montant
+// réellement remboursé est de toute façon recalculé côté base par le
+// trigger `compute_reimbursed_amount` au moment de l'enregistrement.
+const PLAFOND_FALLBACK = 150;
+
+// Mêmes valeurs publiques que dans index.html (clé anon = faite pour être
+// exposée côté client, ce n'est pas un secret).
+const SUPABASE_URL = "https://azlwteuimydrxeuqppdt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6bHd0ZXVpbXlkcnhldXFwcGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODMzNjYsImV4cCI6MjA5OTk1OTM2Nn0.PYflJpIDP5HUegHsiZ2ELvRZ_UVXpsHrsxNXsEQpoLg";
+
+async function fetchPlafond() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/settings?key=eq.plafond_remboursement&select=value_numeric`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      }
+    );
+    if (!res.ok) return PLAFOND_FALLBACK;
+    const rows = await res.json();
+    const value = rows?.[0]?.value_numeric;
+    return typeof value === "number" ? value : PLAFOND_FALLBACK;
+  } catch (e) {
+    return PLAFOND_FALLBACK;
+  }
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -57,24 +88,27 @@ Réponds UNIQUEMENT avec un objet JSON valide (aucun texte avant/après, aucun b
 Si tu ne trouves pas de montant clair, mets "amount": null et explique brièvement dans "notes".`;
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: mediaType, data: base64Data } },
-              ],
-            },
-          ],
-          generationConfig: { temperature: 0, responseMimeType: "application/json" },
-        }),
-      }
-    );
+    const [geminiRes, plafond] = await Promise.all([
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: mediaType, data: base64Data } },
+                ],
+              },
+            ],
+            generationConfig: { temperature: 0, responseMimeType: "application/json" },
+          }),
+        }
+      ),
+      fetchPlafond(),
+    ]);
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
@@ -108,7 +142,9 @@ Si tu ne trouves pas de montant clair, mets "amount": null et explique brièveme
     }
 
     const amount = typeof parsed.amount === "number" ? parsed.amount : null;
-    const reimbursed_amount = amount != null ? Math.min(amount, PLAFOND) : null;
+    // Indicatif uniquement : le montant réellement remboursé est recalculé
+    // côté base (trigger compute_reimbursed_amount) au moment de l'insertion.
+    const reimbursed_amount = amount != null ? Math.min(amount, plafond) : null;
 
     return {
       statusCode: 200,
@@ -119,6 +155,7 @@ Si tu ne trouves pas de montant clair, mets "amount": null et explique brièveme
         confidence: parsed.confidence ?? "low",
         notes: parsed.notes ?? null,
         reimbursed_amount,
+        plafond,
       }),
     };
   } catch (err) {
